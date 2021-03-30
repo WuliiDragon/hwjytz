@@ -1,0 +1,8 @@
+/.idea
+out/*
+SDK_java/code/CodeCraft-2021/CodeCraft-2021.iml
+/*.iml
+/*.zip
+/SDK_java/*.zip
+/SDK_java/bin/*.jar
+/SDK_java/code/CodeCraft-2021/bin
