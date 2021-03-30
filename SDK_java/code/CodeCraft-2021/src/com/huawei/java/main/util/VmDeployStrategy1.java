@@ -21,32 +21,34 @@ public class VmDeployStrategy1 {
                                          Map<Integer, ServerHavePurchase> serverIdMap,
                                          List<Server> serverTypeList,
                                          Map<Integer, List<Integer>> vmMigrationMap) {
-//        boolean isFirstDay = true;
-
 
         Map<String, List<List<ServerHavePurchase>>> serverListByEnergyCost = sortServerListByEnergyCost(serverHaveBuySinAndDouList);
 
         List<List<ServerHavePurchase>> sinServerList = serverListByEnergyCost.get("single");
         List<List<ServerHavePurchase>> douServerList = serverListByEnergyCost.get("double");
 
-
         int nowDay = 0;
-        for (List<VMHaveRequest> vmHaveRequests : vmHaveRequestListCurrent) {
-            nowDay += 1;
-            handleADay(vmHaveRequests, nowDay, vmMigrationMap, serverTypeList, serverListByEnergyCost, serverIdMap, sinServerList, douServerList, vmIdMap);
-        }
+        Queue<List<VMHaveRequest>> vmHaveRequestsUnHandleQueue = new LinkedList<>();
 
-        int x = Initialize.K;
-        for (; x < Initialize.T - 1; x++) {
+        for (int x = 0; x < Initialize.T; x++) {
+
             nowDay += 1;
-            handleADay(Initialize.readDay(), nowDay, vmMigrationMap, serverTypeList, serverListByEnergyCost, serverIdMap, sinServerList, douServerList, vmIdMap);
+            if (x < Initialize.K) {
+                vmHaveRequestsUnHandleQueue.offer(Initialize.readDay());
+            } else {
+                List<VMHaveRequest> vmHaveRequestsADay = vmHaveRequestsUnHandleQueue.poll();
+                handleADay(vmHaveRequestsADay, nowDay, vmMigrationMap, serverTypeList, serverListByEnergyCost, serverIdMap, sinServerList, douServerList, vmIdMap);
+                vmHaveRequestsUnHandleQueue.offer(Initialize.readDay());
+
+            }
+
+
         }
 
         if (!Main.isMatch) {
             Cost.AddCostAllDay(serverHaveBuySinAndDouList);
         }
     }
-
 
     private static void handleADay(List<VMHaveRequest> vmHaveRequestListEveryday,
                                    int nowDay,
