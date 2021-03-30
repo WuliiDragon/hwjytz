@@ -580,9 +580,6 @@ public class VmMigrationStrategy {
 
         Map<Integer, List<Integer>> vmMigrationMapEveryDay = new HashMap<>();
 
-
-
-
         int vmMigrationMaxNum = Main.vmNum/1000*5;
 
 

@@ -15,73 +15,98 @@ import java.util.stream.Collectors;
  * @Date 2021/3/16
  */
 public class VmDeployStrategy1 {
-    public static void vmDeployStrategy1(List<List<VMHaveRequest>> vmHaveRequestListAllDay, Map<Integer, VMHaveRequest> vmIdMap,
+    public static void vmDeployStrategy1(List<List<VMHaveRequest>> vmHaveRequestListCurrent,
+                                         Map<Integer, VMHaveRequest> vmIdMap,
                                          Map<String, List<List<ServerHavePurchase>>> serverHaveBuySinAndDouList,
                                          Map<Integer, ServerHavePurchase> serverIdMap,
                                          List<Server> serverTypeList,
                                          Map<Integer, List<Integer>> vmMigrationMap) {
 //        boolean isFirstDay = true;
 
+
         Map<String, List<List<ServerHavePurchase>>> serverListByEnergyCost = sortServerListByEnergyCost(serverHaveBuySinAndDouList);
 
         List<List<ServerHavePurchase>> sinServerList = serverListByEnergyCost.get("single");
         List<List<ServerHavePurchase>> douServerList = serverListByEnergyCost.get("double");
 
+
         int nowDay = 0;
-        for (List<VMHaveRequest> vmHaveRequestListEveryday : vmHaveRequestListAllDay) {
+        for (List<VMHaveRequest> vmHaveRequests : vmHaveRequestListCurrent) {
             nowDay += 1;
-            if (nowDay > 1) {
-                vmMigrationMap = VmMigrationStrategy.startVmMigrationPlan3_2_thread(serverHaveBuySinAndDouList,serverIdMap);
-                /**
-                 * 迁移完成后重新划分range，单节点以剩余容量大的为准
-                 */
-                sinServerList = DivideIntervalzyl.divideServerByRemainMemCoreEightRange1(serverHaveBuySinAndDouList.get("single"), 1, Main.rangeVM);
-                douServerList = DivideIntervalzyl.divideServerByRemainMemCoreEightRange1(serverHaveBuySinAndDouList.get("double"), 0, Main.rangeVM);
-
-            }
-
-            List<List<ServerHavePurchase>> douServerListBuyToday = new ArrayList<>();
-            List<List<ServerHavePurchase>> sinServerListBuyToday = new ArrayList<>();
-            for (int i = 0; i < Main.rangeVM.length; ++i) {
-                douServerListBuyToday.add(new ArrayList<ServerHavePurchase>());
-                sinServerListBuyToday.add(new ArrayList<ServerHavePurchase>());
-            }
-
-            for (VMHaveRequest vm : vmHaveRequestListEveryday) {
-                int addOrDel = vm.getAddOrDel();
-                //增加虚拟机
-                if (addOrDel == 1) {
-                    Main.vmNum+=1;
-                    int vmDeployType = vm.getDeployType();  // 0是单节点，1是双节点
-                    if (vmDeployType == 1) {
-                        boolean isSuccessLoad  = vmDouNodeDeploy(vm, douServerList); //是否找到可以分配的服务器
-                        if (!isSuccessLoad) {
-                            douNodeServerBuyAndLoadVm(vm, serverTypeList, douServerList, serverIdMap, douServerListBuyToday, nowDay);
-                        }
-                    } else {
-                        boolean isSuccessLoad = vmSinNodeDeploy(vm, sinServerList); //是否找到可以分配的服务器
-                        if (!isSuccessLoad) {
-                            sinNodeServerBuyAndLoadVm(vm, serverTypeList, sinServerList, serverIdMap, sinServerListBuyToday, nowDay);
-                        }
-                    }
-                } else { //删除虚拟机
-                    Main.vmNum-=1;
-                    vmSinAndDouDelete(vmIdMap, vm, serverIdMap);
-                }
-            }
-
-            Map<String, List<List<ServerHavePurchase>>> serverMapBuyToday = new HashMap<>();
-            serverMapBuyToday.put("single", sinServerListBuyToday);
-            serverMapBuyToday.put("double", douServerListBuyToday);
-            Output.everydayOutput(serverHaveBuySinAndDouList, serverMapBuyToday, vmMigrationMap, vmHaveRequestListEveryday, serverIdMap);
-            if(!Main.isMatch) {
-                Cost.AddCostADay(serverHaveBuySinAndDouList);
-            }
+            handleADay(vmHaveRequests, nowDay, vmMigrationMap, serverTypeList, serverListByEnergyCost, serverIdMap, sinServerList, douServerList, vmIdMap);
         }
-        if(!Main.isMatch) {
+
+        int x = Initialize.K;
+        for (; x < Initialize.T - 1; x++) {
+            nowDay += 1;
+            handleADay(Initialize.readDay(), nowDay, vmMigrationMap, serverTypeList, serverListByEnergyCost, serverIdMap, sinServerList, douServerList, vmIdMap);
+        }
+
+        if (!Main.isMatch) {
             Cost.AddCostAllDay(serverHaveBuySinAndDouList);
         }
     }
+
+
+    private static void handleADay(List<VMHaveRequest> vmHaveRequestListEveryday,
+                                   int nowDay,
+                                   Map<Integer, List<Integer>> vmMigrationMap,
+                                   List<Server> serverTypeList,
+                                   Map<String, List<List<ServerHavePurchase>>> serverHaveBuySinAndDouList,
+                                   Map<Integer, ServerHavePurchase> serverIdMap,
+                                   List<List<ServerHavePurchase>> sinServerList,
+                                   List<List<ServerHavePurchase>> douServerList,
+                                   Map<Integer, VMHaveRequest> vmIdMap) {
+
+
+        if (nowDay > 1) {
+            vmMigrationMap = VmMigrationStrategy.startVmMigrationPlan3_2_thread(serverHaveBuySinAndDouList, serverIdMap);
+            sinServerList = DivideIntervalzyl.divideServerByRemainMemCoreEightRange1(serverHaveBuySinAndDouList.get("single"), 1, Main.rangeVM);
+            douServerList = DivideIntervalzyl.divideServerByRemainMemCoreEightRange1(serverHaveBuySinAndDouList.get("double"), 0, Main.rangeVM);
+        }
+
+
+        List<List<ServerHavePurchase>> douServerListBuyToday = new ArrayList<>();
+        List<List<ServerHavePurchase>> sinServerListBuyToday = new ArrayList<>();
+        for (int i = 0; i < Main.rangeVM.length; ++i) {
+            douServerListBuyToday.add(new ArrayList<ServerHavePurchase>());
+            sinServerListBuyToday.add(new ArrayList<ServerHavePurchase>());
+        }
+
+        for (VMHaveRequest vm : vmHaveRequestListEveryday) {
+            int addOrDel = vm.getAddOrDel();
+            //增加虚拟机
+            if (addOrDel == 1) {
+                Main.vmNum += 1;
+                int vmDeployType = vm.getDeployType();  // 0是单节点，1是双节点
+                if (vmDeployType == 1) {
+                    boolean isSuccessLoad = vmDouNodeDeploy(vm, douServerList); //是否找到可以分配的服务器
+                    if (!isSuccessLoad) {
+                        douNodeServerBuyAndLoadVm(vm, serverTypeList, douServerList, serverIdMap, douServerListBuyToday, nowDay);
+                    }
+                } else {
+                    boolean isSuccessLoad = vmSinNodeDeploy(vm, sinServerList); //是否找到可以分配的服务器
+                    if (!isSuccessLoad) {
+                        sinNodeServerBuyAndLoadVm(vm, serverTypeList, sinServerList, serverIdMap, sinServerListBuyToday, nowDay);
+                    }
+                }
+            } else { //删除虚拟机
+                Main.vmNum -= 1;
+                vmSinAndDouDelete(vmIdMap, vm, serverIdMap);
+            }
+        }
+
+        Map<String, List<List<ServerHavePurchase>>> serverMapBuyToday = new HashMap<>();
+        serverMapBuyToday.put("single", sinServerListBuyToday);
+        serverMapBuyToday.put("double", douServerListBuyToday);
+        Output.everydayOutput(serverHaveBuySinAndDouList, serverMapBuyToday, vmMigrationMap, vmHaveRequestListEveryday, serverIdMap);
+        System.out.println("++++++++++++++++++");
+        System.out.println(nowDay);
+        if (!Main.isMatch) {
+            Cost.AddCostADay(serverHaveBuySinAndDouList);
+        }
+    }
+
 
     private static List<List<ServerHavePurchase>> sinNodeServerBuyAndLoadVm(VMHaveRequest vm, List<Server> serverTypeList,
                                                                             List<List<ServerHavePurchase>> sinServerList,
@@ -115,7 +140,7 @@ public class VmDeployStrategy1 {
                     serverHavePurchase.addVM(vm, 0);
                     sinServerList.get(rangeIndex).add(serverHavePurchase);
                     sinServerListBuyToday.get(rangeIndex).add(serverHavePurchase);
-                    updateVmCoreAndMemMap(vm,Main.vmSinMemoryMap,Main.vmSinCoreMap,true);
+                    updateVmCoreAndMemMap(vm, Main.vmSinMemoryMap, Main.vmSinCoreMap, true);
                     return sinServerListBuyToday;
                 }
             }
@@ -163,11 +188,11 @@ public class VmDeployStrategy1 {
                     serverHavePurchase.addVM(vm, 2);
                     douServerList.get(rangeIndex).add(serverHavePurchase);
                     douServerListBuyToday.get(rangeIndex).add(serverHavePurchase);
-                    updateVmCoreAndMemMap(vm,Main.vmDouMemoryMap,Main.vmDouCoreMap,true);
+                    updateVmCoreAndMemMap(vm, Main.vmDouMemoryMap, Main.vmDouCoreMap, true);
                     return douServerListBuyToday;
                 }
             }
-            if (rangeIndex ==  Main.rangeVM.length) {
+            if (rangeIndex == Main.rangeVM.length) {
                 rangeIndex = 0;
             } else {
                 rangeIndex += 1;
@@ -183,9 +208,9 @@ public class VmDeployStrategy1 {
         int serverId = vmHaveRequest.getServerId();
         ServerHavePurchase server = serverIdMap.get(serverId);
         server.delVM(server, vmHaveRequest);
-        if(vmRequest.getDeployType()==1) {
+        if (vmRequest.getDeployType() == 1) {
             updateVmCoreAndMemMap(vmHaveRequest, Main.vmDouMemoryMap, Main.vmDouCoreMap, false);
-        }else{
+        } else {
             updateVmCoreAndMemMap(vmHaveRequest, Main.vmSinMemoryMap, Main.vmSinCoreMap, false);
         }
     }
@@ -222,11 +247,11 @@ public class VmDeployStrategy1 {
                 int remainMemB = server.getServerNodeB().getRemainMemory();
                 if (remainCoreA >= vmCore && remainMemA >= vmMemory) {
                     server.addVM(vm, 0);
-                    updateVmCoreAndMemMap(vm,Main.vmSinMemoryMap,Main.vmSinCoreMap,true);
+                    updateVmCoreAndMemMap(vm, Main.vmSinMemoryMap, Main.vmSinCoreMap, true);
                     return true;
                 } else if (remainCoreB >= vmCore && remainMemB >= vmMemory) {
                     server.addVM(vm, 1);
-                    updateVmCoreAndMemMap(vm,Main.vmSinMemoryMap,Main.vmSinCoreMap,true);
+                    updateVmCoreAndMemMap(vm, Main.vmSinMemoryMap, Main.vmSinCoreMap, true);
                     return true;
                 }
             }
@@ -269,7 +294,7 @@ public class VmDeployStrategy1 {
                 int remainMem = server.getServerNodeA().getRemainMemory();
                 if (remainCore >= vmCore / 2 && remainMem >= vmMemory / 2) {
                     server.addVM(vm, 2);
-                    updateVmCoreAndMemMap(vm,Main.vmDouMemoryMap,Main.vmDouCoreMap,true);
+                    updateVmCoreAndMemMap(vm, Main.vmDouMemoryMap, Main.vmDouCoreMap, true);
                     return true;
                 }
             }
@@ -361,37 +386,38 @@ public class VmDeployStrategy1 {
         }
         return 0;
     }
-    private static void updateVmCoreAndMemMap(VMHaveRequest vm, Map<Integer, List<VMHaveRequest>> vmMemoryMap, Map<Integer, List<VMHaveRequest>> vmCoreMap,boolean isAdd) {
+
+    private static void updateVmCoreAndMemMap(VMHaveRequest vm, Map<Integer, List<VMHaveRequest>> vmMemoryMap, Map<Integer, List<VMHaveRequest>> vmCoreMap, boolean isAdd) {
         int core = vm.getCore();
         int memory = vm.getMemory();
-        if(isAdd){
-            if(vmMemoryMap.containsKey(memory)){
+        if (isAdd) {
+            if (vmMemoryMap.containsKey(memory)) {
                 List<VMHaveRequest> vmHaveRequests = vmMemoryMap.get(memory);
                 vmHaveRequests.add(vm);
-                vmMemoryMap.put(memory,vmHaveRequests);
-            }else{
-                List<VMHaveRequest> vmHaveRequests=new ArrayList<>();
+                vmMemoryMap.put(memory, vmHaveRequests);
+            } else {
+                List<VMHaveRequest> vmHaveRequests = new ArrayList<>();
                 vmHaveRequests.add(vm);
-                vmMemoryMap.put(memory,vmHaveRequests);
+                vmMemoryMap.put(memory, vmHaveRequests);
             }
 
-            if(vmCoreMap.containsKey(core)){
+            if (vmCoreMap.containsKey(core)) {
                 List<VMHaveRequest> vmHaveRequests = vmCoreMap.get(core);
                 vmHaveRequests.add(vm);
-                vmCoreMap.put(core,vmHaveRequests);
-            }else{
-                List<VMHaveRequest> vmHaveRequests=new ArrayList<>();
+                vmCoreMap.put(core, vmHaveRequests);
+            } else {
+                List<VMHaveRequest> vmHaveRequests = new ArrayList<>();
                 vmHaveRequests.add(vm);
-                vmCoreMap.put(core,vmHaveRequests);
+                vmCoreMap.put(core, vmHaveRequests);
             }
-        }else{
+        } else {
             List<VMHaveRequest> vmMemoryList = vmMemoryMap.get(memory);
             vmMemoryList.remove(vm);
-            vmMemoryMap.put(memory,vmMemoryList);
+            vmMemoryMap.put(memory, vmMemoryList);
 
             List<VMHaveRequest> vmCoreList = vmCoreMap.get(core);
             vmCoreList.remove(vm);
-            vmCoreMap.put(core,vmCoreList);
+            vmCoreMap.put(core, vmCoreList);
         }
 
     }

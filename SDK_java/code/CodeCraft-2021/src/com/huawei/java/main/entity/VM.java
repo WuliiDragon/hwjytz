@@ -29,9 +29,11 @@ public class VM implements Comparable<VM> {
     public int compareTo(VM o) {
         return this.typeName.compareTo(o.getTypeName());
     }
+
     public int getDeployType() {
         return deployType;
     }
+
     public String getTypeName() {
         return typeName;
     }
