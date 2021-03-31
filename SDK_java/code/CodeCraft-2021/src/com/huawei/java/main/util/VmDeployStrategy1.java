@@ -39,12 +39,8 @@ public class VmDeployStrategy1 {
                 List<VMHaveRequest> vmHaveRequestsADay = vmHaveRequestsUnHandleQueue.poll();
                 handleADay(vmHaveRequestsADay, nowDay, vmMigrationMap, serverTypeList, serverListByEnergyCost, serverIdMap, sinServerList, douServerList, vmIdMap);
                 vmHaveRequestsUnHandleQueue.offer(Initialize.readDay());
-
             }
-
-
         }
-
         if (!Main.isMatch) {
             Cost.AddCostAllDay(serverHaveBuySinAndDouList);
         }
